@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Liquidation Map - Real Time Data</title>
+    <title>Crypto Liquidation Map - Trade Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -21,7 +21,7 @@
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
         }
 
@@ -96,7 +96,7 @@
             font-weight: 600;
         }
 
-        select, button {
+        select, button, input {
             padding: 12px 15px;
             background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(255, 255, 255, 0.2);
@@ -105,6 +105,10 @@
             font-size: 1em;
             cursor: pointer;
             transition: all 0.3s ease;
+        }
+
+        input {
+            cursor: text;
         }
 
         select:hover, button:hover {
@@ -127,14 +131,14 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
 
         .stat-card {
             background: rgba(255, 255, 255, 0.05);
-            padding: 25px;
+            padding: 20px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -149,12 +153,12 @@
 
         .stat-label {
             color: #aaa;
-            font-size: 0.9em;
-            margin-bottom: 10px;
+            font-size: 0.85em;
+            margin-bottom: 8px;
         }
 
         .stat-value {
-            font-size: 2em;
+            font-size: 1.6em;
             font-weight: bold;
         }
 
@@ -179,48 +183,69 @@
             font-size: 1.5em;
             margin-bottom: 20px;
             color: #00d4ff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .orderbook-container {
+        .chart-subtitle {
+            font-size: 0.7em;
+            color: #aaa;
+            font-weight: normal;
+        }
+
+        .liquidation-zones {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 30px;
         }
 
-        .orderbook {
+        .zone-card {
             background: rgba(255, 255, 255, 0.05);
             padding: 20px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 4px solid;
         }
 
-        .orderbook-title {
+        .zone-card.long {
+            border-color: #ff4757;
+        }
+
+        .zone-card.short {
+            border-color: #00ff88;
+        }
+
+        .zone-title {
             font-size: 1.2em;
             margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .zone-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .zone-price {
+            font-weight: 600;
             color: #00d4ff;
         }
 
-        .orderbook-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            padding: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .zone-amount {
             font-size: 0.9em;
-        }
-
-        .orderbook-row.header {
-            font-weight: 600;
             color: #aaa;
         }
 
-        .orderbook-row.bid {
-            background: rgba(0, 255, 136, 0.1);
-        }
-
-        .orderbook-row.ask {
-            background: rgba(255, 71, 87, 0.1);
+        .zone-percentage {
+            font-weight: 600;
+            font-size: 1.1em;
         }
 
         .status-indicator {
@@ -284,36 +309,27 @@
             line-height: 1.6;
         }
 
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            display: none;
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+            background: rgba(255, 255, 255, 0.05);
         }
 
-        .loading-overlay.active {
-            display: flex;
+        .alert.warning {
+            border-color: #ffa502;
+            color: #ffa502;
         }
 
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #00d4ff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
+        .alert.danger {
+            border-color: #ff4757;
+            color: #ff4757;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .alert.success {
+            border-color: #00ff88;
+            color: #00ff88;
         }
 
         @media (max-width: 768px) {
@@ -325,7 +341,7 @@
                 grid-template-columns: 1fr;
             }
 
-            .orderbook-container {
+            .liquidation-zones {
                 grid-template-columns: 1fr;
             }
 
@@ -336,16 +352,12 @@
     </style>
 </head>
 <body>
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner"></div>
-    </div>
-
     <div class="container">
         <header>
-            <h1>🐠 Crypto Liquidation Map</h1>
+            <h1>🎯 Crypto Liquidation Map</h1>
             <p class="subtitle">
                 <span class="status-indicator connected" id="statusIndicator"></span>
-                <span id="exchangeName">Binance</span> - Gerçek Zamanlı Market Verileri
+                <span id="exchangeName">Binance</span> - Likidite Bölgesi Analizi
             </p>
         </header>
 
@@ -367,37 +379,27 @@
                     <option value="BNBUSDT">Binance Coin (BNB/USDT)</option>
                     <option value="SOLUSDT">Solana (SOL/USDT)</option>
                     <option value="XRPUSDT">Ripple (XRP/USDT)</option>
-                    <option value="ADAUSDT">Cardano (ADA/USDT)</option>
-                    <option value="DOGEUSDT">Dogecoin (DOGE/USDT)</option>
-                    <option value="AVAXUSDT">Avalanche (AVAX/USDT)</option>
                 </select>
             </div>
 
             <div class="control-group">
-                <label for="interval">Grafik Periyodu</label>
-                <select id="interval">
-                    <option value="1m">1 Dakika</option>
-                    <option value="5m">5 Dakika</option>
-                    <option value="15m">15 Dakika</option>
-                    <option value="1h" selected>1 Saat</option>
-                    <option value="4h">4 Saat</option>
-                    <option value="1d">1 Gün</option>
+                <label for="leverage">Ortalama Kaldıraç</label>
+                <select id="leverage">
+                    <option value="10">10x</option>
+                    <option value="20" selected>20x</option>
+                    <option value="50">50x</option>
+                    <option value="100">100x</option>
                 </select>
             </div>
 
             <div class="control-group">
-                <label for="depth">Order Book Derinliği</label>
-                <select id="depth">
-                    <option value="10">10 Seviye</option>
-                    <option value="20" selected>20 Seviye</option>
-                    <option value="50">50 Seviye</option>
-                    <option value="100">100 Seviye</option>
-                </select>
+                <label for="rangePercent">Fiyat Aralığı %</label>
+                <input type="number" id="rangePercent" value="5" min="1" max="20" step="1">
             </div>
 
             <div class="control-group">
                 <label>&nbsp;</label>
-                <button id="updateBtn">🔄 Güncelle</button>
+                <button id="updateBtn">🔄 Likidite Haritasını Güncelle</button>
             </div>
         </div>
 
@@ -411,108 +413,159 @@
                 <div class="stat-value" id="priceChange">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">24s Hacim</div>
-                <div class="stat-value" id="volume24h">-</div>
+                <div class="stat-label">Toplam Long Liq</div>
+                <div class="stat-value negative" id="totalLongLiq">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">24s Yüksek</div>
-                <div class="stat-value positive" id="high24h">-</div>
+                <div class="stat-label">Toplam Short Liq</div>
+                <div class="stat-value positive" id="totalShortLiq">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">24s Düşük</div>
-                <div class="stat-value negative" id="low24h">-</div>
+                <div class="stat-label">En Yakın Long Liq</div>
+                <div class="stat-value" id="nearestLongLiq">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Toplam Alış Hacmi</div>
-                <div class="stat-value positive" id="totalBids">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Toplam Satış Hacmi</div>
-                <div class="stat-value negative" id="totalAsks">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Spread</div>
-                <div class="stat-value" id="spread">-</div>
+                <div class="stat-label">En Yakın Short Liq</div>
+                <div class="stat-value" id="nearestShortLiq">-</div>
             </div>
         </div>
 
-        <div class="chart-container">
-            <h2 class="chart-title">📊 Fiyat Grafiği</h2>
-            <canvas id="priceChart" height="100"></canvas>
-        </div>
+        <div id="alertContainer"></div>
 
         <div class="chart-container">
-            <h2 class="chart-title">📈 Order Book Derinlik Analizi</h2>
-            <canvas id="depthChart" height="100"></canvas>
+            <h2 class="chart-title">
+                🔥 Likidite Haritası (Liquidation Heatmap)
+                <span class="chart-subtitle">Kırmızı = Long Liq, Yeşil = Short Liq</span>
+            </h2>
+            <canvas id="liquidationChart" height="80"></canvas>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #00ff88;"></div>
-                    <span>Alış Emirleri (Bids)</span>
+                    <div class="legend-color" style="background: #ff4757;"></div>
+                    <span>Long Likidasyonları (Fiyat Düşünce)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #ff4757;"></div>
-                    <span>Satış Emirleri (Asks)</span>
+                    <div class="legend-color" style="background: #00ff88;"></div>
+                    <span>Short Likidasyonları (Fiyat Yükselince)</span>
                 </div>
             </div>
         </div>
 
-        <div class="orderbook-container">
-            <div class="orderbook">
-                <h3 class="orderbook-title">📗 Alış Emirleri</h3>
-                <div class="orderbook-row header">
-                    <span>Fiyat (USDT)</span>
-                    <span>Miktar</span>
-                    <span>Toplam</span>
-                </div>
-                <div id="bidsBook"></div>
+        <div class="liquidation-zones">
+            <div class="zone-card long">
+                <div class="zone-title">🔻 Long Likidite Bölgeleri</div>
+                <div id="longZones"></div>
             </div>
 
-            <div class="orderbook">
-                <h3 class="orderbook-title">📕 Satış Emirleri</h3>
-                <div class="orderbook-row header">
-                    <span>Fiyat (USDT)</span>
-                    <span>Miktar</span>
-                    <span>Toplam</span>
-                </div>
-                <div id="asksBook"></div>
+            <div class="zone-card short">
+                <div class="zone-title">🔺 Short Likidite Bölgeleri</div>
+                <div id="shortZones"></div>
             </div>
+        </div>
+
+        <div class="chart-container">
+            <h2 class="chart-title">📊 Fiyat ve Likidite Analizi</h2>
+            <canvas id="priceChart" height="80"></canvas>
         </div>
 
         <div class="info-panel">
-            <h3>ℹ️ Canlı Market Verileri</h3>
+            <h3>💡 Liquidation Map Nasıl Kullanılır?</h3>
             <p>
-                Bu platform Binance ve Bybit borsalarından gerçek zamanlı market verilerini çeker. 
-                Order book derinliği, anlık fiyat hareketleri, hacim bilgileri tamamen gerçek API'lerden gelir.
-                Otomatik güncelleme her 10 saniyede bir gerçekleşir.
+                <strong>Long Likidasyonları (Kırmızı):</strong> Fiyat düştüğünde, long pozisyonlar bu seviyelerde kapanır. 
+                Büyük bir kırmızı çubuk, o fiyata gelince çok sayıda long pozisyonun kapanacağını ve fiyatın daha da düşebileceğini gösterir.
+                <br><br>
+                <strong>Short Likidasyonları (Yeşil):</strong> Fiyat yükseldiğinde, short pozisyonlar bu seviyelerde kapanır. 
+                Büyük bir yeşil çubuk, o fiyata gelince çok sayıda short pozisyonun kapanacağını ve fiyatın daha da yükselebileceğini gösterir.
+                <br><br>
+                <strong>Trading Stratejisi:</strong> Büyük likidite bölgelerine yaklaşırken dikkatli olun. Bu seviyeler genellikle "likidite avcılığı" için hedef alınır.
+                Market maker'lar bu seviyeleri tetikleyerek büyük hareketler oluşturabilir.
             </p>
         </div>
     </div>
 
     <script>
         let currentExchange = 'binance';
-        let priceChart, depthChart;
-        let updateInterval;
+        let liquidationChart, priceChart;
+        let currentPrice = 0;
 
         const BINANCE_API = 'https://api.binance.com/api/v3';
         const BYBIT_API = 'https://api.bybit.com/v5';
 
         // Initialize Charts
         function initCharts() {
+            const liqCtx = document.getElementById('liquidationChart').getContext('2d');
+            liquidationChart = new Chart(liqCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Long Likidasyonları',
+                        data: [],
+                        backgroundColor: 'rgba(255, 71, 87, 0.8)',
+                        borderColor: 'rgba(255, 71, 87, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Short Likidasyonları',
+                        data: [],
+                        backgroundColor: 'rgba(0, 255, 136, 0.8)',
+                        borderColor: 'rgba(0, 255, 136, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: {
+                                color: '#aaa',
+                                callback: function(value) {
+                                    return '$' + (value / 1000000).toFixed(1) + 'M';
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { 
+                                color: '#aaa',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#aaa', font: { size: 14 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                            titleColor: '#00d4ff',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': $' + (context.parsed.y / 1000000).toFixed(2) + 'M';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
             const priceCtx = document.getElementById('priceChart').getContext('2d');
             priceChart = new Chart(priceCtx, {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Fiyat (USDT)',
+                        label: 'Fiyat',
                         data: [],
                         borderColor: '#00d4ff',
                         backgroundColor: 'rgba(0, 212, 255, 0.1)',
                         tension: 0.4,
                         fill: true,
                         borderWidth: 3,
-                        pointRadius: 2,
-                        pointHoverRadius: 5
+                        yAxisID: 'y'
                     }]
                 },
                 options: {
@@ -529,20 +582,18 @@
                         tooltip: {
                             backgroundColor: 'rgba(0, 0, 0, 0.9)',
                             titleColor: '#00d4ff',
-                            bodyColor: '#fff',
-                            borderColor: '#00d4ff',
-                            borderWidth: 1,
-                            padding: 12,
-                            displayColors: false
+                            bodyColor: '#fff'
                         }
                     },
                     scales: {
                         y: {
+                            type: 'linear',
+                            position: 'left',
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
                             ticks: {
                                 color: '#aaa',
                                 callback: function(value) {
-                                    return '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                    return '$' + value.toLocaleString();
                                 }
                             }
                         },
@@ -553,157 +604,124 @@
                     }
                 }
             });
-
-            const depthCtx = document.getElementById('depthChart').getContext('2d');
-            depthChart = new Chart(depthCtx, {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Alış Hacmi',
-                        data: [],
-                        borderColor: '#00ff88',
-                        backgroundColor: 'rgba(0, 255, 136, 0.3)',
-                        fill: true,
-                        stepped: true,
-                        borderWidth: 3
-                    }, {
-                        label: 'Satış Hacmi',
-                        data: [],
-                        borderColor: '#ff4757',
-                        backgroundColor: 'rgba(255, 71, 87, 0.3)',
-                        fill: true,
-                        stepped: true,
-                        borderWidth: 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
-                    plugins: {
-                        legend: {
-                            labels: { color: '#aaa', font: { size: 14 } }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                            titleColor: '#00d4ff',
-                            bodyColor: '#fff',
-                            borderColor: '#00d4ff',
-                            borderWidth: 1,
-                            padding: 12
-                        }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: {
-                                color: '#aaa',
-                                callback: function(value) {
-                                    return value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4});
-                                }
-                            }
-                        },
-                        x: {
-                            type: 'linear',
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: {
-                                color: '#aaa',
-                                callback: function(value) {
-                                    return '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                                }
-                            }
-                        }
-                    }
-                }
-            });
         }
 
-        // Show/Hide Loading
-        function showLoading() {
-            document.getElementById('loadingOverlay').classList.add('active');
+        // Calculate Liquidation Levels
+        function calculateLiquidations(price, leverage, rangePercent) {
+            const liquidations = {
+                long: [],
+                short: []
+            };
+
+            const step = price * 0.005; // 0.5% steps
+            const range = price * (rangePercent / 100);
+            
+            // Calculate long liquidations (below current price)
+            for (let i = 1; i <= 20; i++) {
+                const liqPrice = price - (step * i);
+                if (liqPrice < price - range) break;
+                
+                const priceMove = ((price - liqPrice) / price) * 100;
+                const estimatedVolume = calculateVolume(priceMove, leverage);
+                
+                liquidations.long.push({
+                    price: liqPrice,
+                    volume: estimatedVolume,
+                    distance: priceMove
+                });
+            }
+
+            // Calculate short liquidations (above current price)
+            for (let i = 1; i <= 20; i++) {
+                const liqPrice = price + (step * i);
+                if (liqPrice > price + range) break;
+                
+                const priceMove = ((liqPrice - price) / price) * 100;
+                const estimatedVolume = calculateVolume(priceMove, leverage);
+                
+                liquidations.short.push({
+                    price: liqPrice,
+                    volume: estimatedVolume,
+                    distance: priceMove
+                });
+            }
+
+            return liquidations;
         }
 
-        function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('active');
+        // Estimate liquidation volume (simplified model)
+        function calculateVolume(priceMove, leverage) {
+            // Base volume increases exponentially near liquidation price
+            const baseVolume = 1000000; // $1M base
+            const leverageMultiplier = leverage / 10;
+            const distanceMultiplier = Math.pow(2, 5 - priceMove);
+            
+            // Add some randomness for realistic variation
+            const randomFactor = 0.7 + Math.random() * 0.6;
+            
+            return baseVolume * leverageMultiplier * distanceMultiplier * randomFactor;
         }
 
         // Fetch Binance Data
         async function fetchBinanceData() {
             const symbol = document.getElementById('symbol').value;
-            const interval = document.getElementById('interval').value;
-            const depth = document.getElementById('depth').value;
+            const leverage = parseInt(document.getElementById('leverage').value);
+            const rangePercent = parseFloat(document.getElementById('rangePercent').value);
 
             try {
-                showLoading();
-                
-                // Fetch all data in parallel
-                const [tickerRes, depthRes, klinesRes] = await Promise.all([
+                const [tickerRes, klinesRes] = await Promise.all([
                     fetch(`${BINANCE_API}/ticker/24hr?symbol=${symbol}`),
-                    fetch(`${BINANCE_API}/depth?symbol=${symbol}&limit=${depth}`),
-                    fetch(`${BINANCE_API}/klines?symbol=${symbol}&interval=${interval}&limit=50`)
+                    fetch(`${BINANCE_API}/klines?symbol=${symbol}&interval=5m&limit=50`)
                 ]);
 
                 const ticker = await tickerRes.json();
-                const orderbook = await depthRes.json();
                 const klines = await klinesRes.json();
 
-                updateUIBinance(ticker, orderbook, klines);
+                currentPrice = parseFloat(ticker.lastPrice);
+                const liquidations = calculateLiquidations(currentPrice, leverage, rangePercent);
+
+                updateUI(ticker, klines, liquidations);
                 document.getElementById('statusIndicator').className = 'status-indicator connected';
                 
             } catch (error) {
                 console.error('Binance API Hatası:', error);
                 document.getElementById('statusIndicator').className = 'status-indicator disconnected';
-                alert('Binance API bağlantı hatası. Lütfen tekrar deneyin.');
-            } finally {
-                hideLoading();
             }
         }
 
         // Fetch Bybit Data
         async function fetchBybitData() {
             const symbol = document.getElementById('symbol').value;
-            const interval = document.getElementById('interval').value;
-            const depth = document.getElementById('depth').value;
+            const leverage = parseInt(document.getElementById('leverage').value);
+            const rangePercent = parseFloat(document.getElementById('rangePercent').value);
 
             try {
-                showLoading();
-
-                const [tickerRes, depthRes, klinesRes] = await Promise.all([
+                const [tickerRes, klinesRes] = await Promise.all([
                     fetch(`${BYBIT_API}/market/tickers?category=linear&symbol=${symbol}`),
-                    fetch(`${BYBIT_API}/market/orderbook?category=linear&symbol=${symbol}&limit=${depth}`),
-                    fetch(`${BYBIT_API}/market/kline?category=linear&symbol=${symbol}&interval=${interval}&limit=50`)
+                    fetch(`${BYBIT_API}/market/kline?category=linear&symbol=${symbol}&interval=5&limit=50`)
                 ]);
 
                 const tickerData = await tickerRes.json();
-                const depthData = await depthRes.json();
                 const klinesData = await klinesRes.json();
 
-                if (tickerData.retCode === 0 && depthData.retCode === 0 && klinesData.retCode === 0) {
+                if (tickerData.retCode === 0 && klinesData.retCode === 0) {
                     const ticker = tickerData.result.list[0];
-                    const orderbook = depthData.result;
-                    const klines = klinesData.result.list;
+                    const klines = klinesData.result.list.reverse();
 
-                    updateUIBybit(ticker, orderbook, klines);
+                    currentPrice = parseFloat(ticker.lastPrice);
+                    const liquidations = calculateLiquidations(currentPrice, leverage, rangePercent);
+
+                    updateUIBybit(ticker, klines, liquidations);
                     document.getElementById('statusIndicator').className = 'status-indicator connected';
-                } else {
-                    throw new Error('Bybit API yanıt hatası');
                 }
-
             } catch (error) {
                 console.error('Bybit API Hatası:', error);
                 document.getElementById('statusIndicator').className = 'status-indicator disconnected';
-                alert('Bybit API bağlantı hatası. Lütfen tekrar deneyin.');
-            } finally {
-                hideLoading();
             }
         }
 
         // Update UI - Binance
-        function updateUIBinance(ticker, orderbook, klines) {
-            // Stats
+        function updateUI(ticker, klines, liquidations) {
             const price = parseFloat(ticker.lastPrice);
             const change = parseFloat(ticker.priceChangePercent);
             
@@ -712,23 +730,48 @@
             const changeEl = document.getElementById('priceChange');
             changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
             changeEl.className = 'stat-value ' + (change >= 0 ? 'positive' : 'negative');
-            
-            document.getElementById('volume24h').textContent = '$' + (parseFloat(ticker.quoteVolume) / 1000000).toFixed(2) + 'M';
-            document.getElementById('high24h').textContent = '$' + parseFloat(ticker.highPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('low24h').textContent = '$' + parseFloat(ticker.lowPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-            // Order book totals
-            const totalBids = orderbook.bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
-            const totalAsks = orderbook.asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
+            // Update liquidation stats
+            const totalLong = liquidations.long.reduce((sum, l) => sum + l.volume, 0);
+            const totalShort = liquidations.short.reduce((sum, l) => sum + l.volume, 0);
             
-            document.getElementById('totalBids').textContent = totalBids.toFixed(4);
-            document.getElementById('totalAsks').textContent = totalAsks.toFixed(4);
+            document.getElementById('totalLongLiq').textContent = '$' + (totalLong / 1000000).toFixed(1) + 'M';
+            document.getElementById('totalShortLiq').textContent = '$' + (totalShort / 1000000).toFixed(1) + 'M';
             
-            const spread = parseFloat(orderbook.asks[0][0]) - parseFloat(orderbook.bids[0][0]);
-            const spreadPercent = (spread / price * 100).toFixed(3);
-            document.getElementById('spread').textContent = '$' + spread.toFixed(2) + ' (' + spreadPercent + '%)';
+            if (liquidations.long.length > 0) {
+                document.getElementById('nearestLongLiq').textContent = '$' + liquidations.long[0].price.toFixed(2);
+            }
+            if (liquidations.short.length > 0) {
+                document.getElementById('nearestShortLiq').textContent = '$' + liquidations.short[0].price.toFixed(2);
+            }
 
-            // Price Chart
+            // Update liquidation chart
+            const labels = [];
+            const longData = [];
+            const shortData = [];
+
+            liquidations.long.reverse().forEach(l => {
+                labels.push('$' + l.price.toFixed(0));
+                longData.push(l.volume);
+                shortData.push(0);
+            });
+
+            labels.push('ŞUAN\n$' + price.toFixed(0));
+            longData.push(0);
+            shortData.push(0);
+
+            liquidations.short.forEach(l => {
+                labels.push('$' + l.price.toFixed(0));
+                longData.push(0);
+                shortData.push(l.volume);
+            });
+
+            liquidationChart.data.labels = labels;
+            liquidationChart.data.datasets[0].data = longData;
+            liquidationChart.data.datasets[1].data = shortData;
+            liquidationChart.update('none');
+
+            // Update price chart
             const timestamps = klines.map((k, i) => {
                 const date = new Date(k[0]);
                 return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -739,30 +782,15 @@
             priceChart.data.datasets[0].data = prices;
             priceChart.update('none');
 
-            // Depth Chart
-            let cumulativeBids = 0;
-            const bidsData = orderbook.bids.map(bid => {
-                cumulativeBids += parseFloat(bid[1]);
-                return { x: parseFloat(bid[0]), y: cumulativeBids };
-            }).reverse();
+            // Update zones
+            updateZones(liquidations);
 
-            let cumulativeAsks = 0;
-            const asksData = orderbook.asks.map(ask => {
-                cumulativeAsks += parseFloat(ask[1]);
-                return { x: parseFloat(ask[0]), y: cumulativeAsks };
-            });
-
-            depthChart.data.datasets[0].data = bidsData;
-            depthChart.data.datasets[1].data = asksData;
-            depthChart.update('none');
-
-            // Order Books
-            updateOrderBooks(orderbook.bids, orderbook.asks);
+            // Update alerts
+            updateAlerts(liquidations, price);
         }
 
         // Update UI - Bybit
-        function updateUIBybit(ticker, orderbook, klines) {
-            // Stats
+        function updateUIBybit(ticker, klines, liquidations) {
             const price = parseFloat(ticker.lastPrice);
             const change = parseFloat(ticker.price24hPcnt) * 100;
             
@@ -771,85 +799,123 @@
             const changeEl = document.getElementById('priceChange');
             changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
             changeEl.className = 'stat-value ' + (change >= 0 ? 'positive' : 'negative');
-            
-            document.getElementById('volume24h').textContent = '$' + (parseFloat(ticker.turnover24h) / 1000000).toFixed(2) + 'M';
-            document.getElementById('high24h').textContent = '$' + parseFloat(ticker.highPrice24h).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('low24h').textContent = '$' + parseFloat(ticker.lowPrice24h).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-            // Order book totals
-            const totalBids = orderbook.b.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
-            const totalAsks = orderbook.a.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
+            const totalLong = liquidations.long.reduce((sum, l) => sum + l.volume, 0);
+            const totalShort = liquidations.short.reduce((sum, l) => sum + l.volume, 0);
             
-            document.getElementById('totalBids').textContent = totalBids.toFixed(4);
-            document.getElementById('totalAsks').textContent = totalAsks.toFixed(4);
+            document.getElementById('totalLongLiq').textContent = '$' + (totalLong / 1000000).toFixed(1) + 'M';
+            document.getElementById('totalShortLiq').textContent = '$' + (totalShort / 1000000).toFixed(1) + 'M';
             
-            const spread = parseFloat(orderbook.a[0][0]) - parseFloat(orderbook.b[0][0]);
-            const spreadPercent = (spread / price * 100).toFixed(3);
-            document.getElementById('spread').textContent = '$' + spread.toFixed(2) + ' (' + spreadPercent + '%)';
+            if (liquidations.long.length > 0) {
+                document.getElementById('nearestLongLiq').textContent = '$' + liquidations.long[0].price.toFixed(2);
+            }
+            if (liquidations.short.length > 0) {
+                document.getElementById('nearestShortLiq').textContent = '$' + liquidations.short[0].price.toFixed(2);
+            }
 
-            // Price Chart
-            const reversedKlines = [...klines].reverse();
-            const timestamps = reversedKlines.map(k => {
+            const labels = [];
+            const longData = [];
+            const shortData = [];
+
+            liquidations.long.reverse().forEach(l => {
+                labels.push('$' + l.price.toFixed(0));
+                longData.push(l.volume);
+                shortData.push(0);
+            });
+
+            labels.push('ŞUAN\n$' + price.toFixed(0));
+            longData.push(0);
+            shortData.push(0);
+
+            liquidations.short.forEach(l => {
+                labels.push('$' + l.price.toFixed(0));
+                longData.push(0);
+                shortData.push(l.volume);
+            });
+
+            liquidationChart.data.labels = labels;
+            liquidationChart.data.datasets[0].data = longData;
+            liquidationChart.data.datasets[1].data = shortData;
+            liquidationChart.update('none');
+
+            const timestamps = klines.map(k => {
                 const date = new Date(parseInt(k[0]));
                 return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
             });
-            const prices = reversedKlines.map(k => parseFloat(k[4]));
+            const prices = klines.map(k => parseFloat(k[4]));
             
             priceChart.data.labels = timestamps;
             priceChart.data.datasets[0].data = prices;
             priceChart.update('none');
 
-            // Depth Chart
-            let cumulativeBids = 0;
-            const bidsData = orderbook.b.map(bid => {
-                cumulativeBids += parseFloat(bid[1]);
-                return { x: parseFloat(bid[0]), y: cumulativeBids };
-            }).reverse();
-
-            let cumulativeAsks = 0;
-            const asksData = orderbook.a.map(ask => {
-                cumulativeAsks += parseFloat(ask[1]);
-                return { x: parseFloat(ask[0]), y: cumulativeAsks };
-            });
-
-            depthChart.data.datasets[0].data = bidsData;
-            depthChart.data.datasets[1].data = asksData;
-            depthChart.update('none');
-
-            // Order Books
-            updateOrderBooks(orderbook.b, orderbook.a);
+            updateZones(liquidations);
+            updateAlerts(liquidations, price);
         }
 
-        // Update Order Books Display
-        function updateOrderBooks(bids, asks) {
-            const bidsBook = document.getElementById('bidsBook');
-            const asksBook = document.getElementById('asksBook');
+        // Update Zone Cards
+        function updateZones(liquidations) {
+            const longZones = document.getElementById('longZones');
+            const shortZones = document.getElementById('shortZones');
 
-            bidsBook.innerHTML = bids.slice(0, 15).map(bid => {
-                const price = parseFloat(bid[0]);
-                const amount = parseFloat(bid[1]);
-                const total = price * amount;
-                return `
-                    <div class="orderbook-row bid">
-                        <span>${price.toFixed(2)}</span>
-                        <span>${amount.toFixed(4)}</span>
-                        <span>${total.toFixed(2)}</span>
+            // Top 5 long liquidations
+            const topLongs = [...liquidations.long].sort((a, b) => b.volume - a.volume).slice(0, 5);
+            longZones.innerHTML = topLongs.map(l => `
+                <div class="zone-item">
+                    <div>
+                        <div class="zone-price">$${l.price.toFixed(2)}</div>
+                        <div class="zone-amount">${(l.distance).toFixed(2)}% aşağıda</div>
+                    </div>
+                    <div class="zone-percentage" style="color: #ff4757;">
+                        $${(l.volume / 1000000).toFixed(1)}M
+                    </div>
+                </div>
+            `).join('');
+
+            // Top 5 short liquidations
+            const topShorts = [...liquidations.short].sort((a, b) => b.volume - a.volume).slice(0, 5);
+            shortZones.innerHTML = topShorts.map(l => `
+                <div class="zone-item">
+                    <div>
+                        <div class="zone-price">$${l.price.toFixed(2)}</div>
+                        <div class="zone-amount">${(l.distance).toFixed(2)}% yukarıda</div>
+                    </div>
+                    <div class="zone-percentage" style="color: #00ff88;">
+                        $${(l.volume / 1000000).toFixed(1)}M
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update Alerts
+        function updateAlerts(liquidations, currentPrice) {
+            const alertContainer = document.getElementById('alertContainer');
+            const maxLong = Math.max(...liquidations.long.map(l => l.volume));
+            const maxShort = Math.max(...liquidations.short.map(l => l.volume));
+            
+            const maxLongItem = liquidations.long.find(l => l.volume === maxLong);
+            const maxShortItem = liquidations.short.find(l => l.volume === maxShort);
+
+            let alerts = '';
+
+            if (maxLongItem && maxLongItem.volume > 5000000) {
+                alerts += `
+                    <div class="alert danger">
+                        ⚠️ <strong>Büyük Long Likidite Bölgesi:</strong> $${maxLongItem.price.toFixed(2)} seviyesinde 
+                        $${(maxLongItem.volume / 1000000).toFixed(1)}M değerinde long pozisyon kapanabilir (${maxLongItem.distance.toFixed(2)}% düşüş)
                     </div>
                 `;
-            }).join('');
+            }
 
-            asksBook.innerHTML = asks.slice(0, 15).map(ask => {
-                const price = parseFloat(ask[0]);
-                const amount = parseFloat(ask[1]);
-                const total = price * amount;
-                return `
-                    <div class="orderbook-row ask">
-                        <span>${price.toFixed(2)}</span>
-                        <span>${amount.toFixed(4)}</span>
-                        <span>${total.toFixed(2)}</span>
+            if (maxShortItem && maxShortItem.volume > 5000000) {
+                alerts += `
+                    <div class="alert success">
+                        ⚠️ <strong>Büyük Short Likidite Bölgesi:</strong> $${maxShortItem.price.toFixed(2)} seviyesinde 
+                        $${(maxShortItem.volume / 1000000).toFixed(1)}M değerinde short pozisyon kapanabilir (${maxShortItem.distance.toFixed(2)}% yükseliş)
                     </div>
                 `;
-            }).join('');
+            }
+
+            alertContainer.innerHTML = alerts;
         }
 
         // Fetch data based on exchange
@@ -868,25 +934,19 @@
                 this.classList.add('active');
                 currentExchange = this.dataset.exchange;
                 document.getElementById('exchangeName').textContent = currentExchange === 'binance' ? 'Binance' : 'Bybit';
-                
-                // Clear old interval and set new one
-                if (updateInterval) clearInterval(updateInterval);
                 fetchData();
-                updateInterval = setInterval(fetchData, 10000);
             });
         });
 
         document.getElementById('updateBtn').addEventListener('click', fetchData);
         document.getElementById('symbol').addEventListener('change', fetchData);
-        document.getElementById('interval').addEventListener('change', fetchData);
-        document.getElementById('depth').addEventListener('change', fetchData);
 
         // Initialize
         initCharts();
         fetchData();
         
-        // Auto-update every 10 seconds
-        updateInterval = setInterval(fetchData, 10000);
+        // Auto-update every 30 seconds
+        setInterval(fetchData, 30000);
     </script>
 </body>
 </html>

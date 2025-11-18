@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Liquidation Map - Live Market Data</title>
+    <title>Crypto Liquidation Map - Real Time Data</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -223,13 +223,6 @@
             background: rgba(255, 71, 87, 0.1);
         }
 
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #aaa;
-            font-size: 1.1em;
-        }
-
         .status-indicator {
             display: inline-block;
             width: 12px;
@@ -291,6 +284,38 @@
             line-height: 1.6;
         }
 
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             h1 {
                 font-size: 1.8em;
@@ -311,12 +336,16 @@
     </style>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
     <div class="container">
         <header>
-            <h1>🐠 Crypto Liquidation Map - Live Data</h1>
+            <h1>🐠 Crypto Liquidation Map</h1>
             <p class="subtitle">
                 <span class="status-indicator connected" id="statusIndicator"></span>
-                Gerçek Zamanlı Binance & Bybit Verileri
+                <span id="exchangeName">Binance</span> - Gerçek Zamanlı Market Verileri
             </p>
         </header>
 
@@ -340,12 +369,12 @@
                     <option value="XRPUSDT">Ripple (XRP/USDT)</option>
                     <option value="ADAUSDT">Cardano (ADA/USDT)</option>
                     <option value="DOGEUSDT">Dogecoin (DOGE/USDT)</option>
-                    <option value="MATICUSDT">Polygon (MATIC/USDT)</option>
+                    <option value="AVAXUSDT">Avalanche (AVAX/USDT)</option>
                 </select>
             </div>
 
             <div class="control-group">
-                <label for="interval">Zaman Dilimi</label>
+                <label for="interval">Grafik Periyodu</label>
                 <select id="interval">
                     <option value="1m">1 Dakika</option>
                     <option value="5m">5 Dakika</option>
@@ -357,12 +386,12 @@
             </div>
 
             <div class="control-group">
-                <label for="depth">Derinlik</label>
+                <label for="depth">Order Book Derinliği</label>
                 <select id="depth">
-                    <option value="5">5 Seviye</option>
                     <option value="10">10 Seviye</option>
                     <option value="20" selected>20 Seviye</option>
                     <option value="50">50 Seviye</option>
+                    <option value="100">100 Seviye</option>
                 </select>
             </div>
 
@@ -374,8 +403,8 @@
 
         <div class="stats">
             <div class="stat-card">
-                <div class="stat-label">Mevcut Fiyat</div>
-                <div class="stat-value" id="currentPrice">-</div>
+                <div class="stat-label">Anlık Fiyat</div>
+                <div class="stat-value" id="currentPrice">Yükleniyor...</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">24s Değişim</div>
@@ -386,19 +415,19 @@
                 <div class="stat-value" id="volume24h">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">24s En Yüksek</div>
-                <div class="stat-value" id="high24h">-</div>
+                <div class="stat-label">24s Yüksek</div>
+                <div class="stat-value positive" id="high24h">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">24s En Düşük</div>
-                <div class="stat-value" id="low24h">-</div>
+                <div class="stat-label">24s Düşük</div>
+                <div class="stat-value negative" id="low24h">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Toplam Alış</div>
+                <div class="stat-label">Toplam Alış Hacmi</div>
                 <div class="stat-value positive" id="totalBids">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Toplam Satış</div>
+                <div class="stat-label">Toplam Satış Hacmi</div>
                 <div class="stat-value negative" id="totalAsks">-</div>
             </div>
             <div class="stat-card">
@@ -408,12 +437,12 @@
         </div>
 
         <div class="chart-container">
-            <h2 class="chart-title">📊 Fiyat Grafiği (Gerçek Zamanlı)</h2>
+            <h2 class="chart-title">📊 Fiyat Grafiği</h2>
             <canvas id="priceChart" height="100"></canvas>
         </div>
 
         <div class="chart-container">
-            <h2 class="chart-title">📈 Likidite Derinlik Analizi</h2>
+            <h2 class="chart-title">📈 Order Book Derinlik Analizi</h2>
             <canvas id="depthChart" height="100"></canvas>
             <div class="legend">
                 <div class="legend-item">
@@ -429,9 +458,9 @@
 
         <div class="orderbook-container">
             <div class="orderbook">
-                <h3 class="orderbook-title">📗 Alış Emirleri (Bids)</h3>
+                <h3 class="orderbook-title">📗 Alış Emirleri</h3>
                 <div class="orderbook-row header">
-                    <span>Fiyat</span>
+                    <span>Fiyat (USDT)</span>
                     <span>Miktar</span>
                     <span>Toplam</span>
                 </div>
@@ -439,9 +468,9 @@
             </div>
 
             <div class="orderbook">
-                <h3 class="orderbook-title">📕 Satış Emirleri (Asks)</h3>
+                <h3 class="orderbook-title">📕 Satış Emirleri</h3>
                 <div class="orderbook-row header">
-                    <span>Fiyat</span>
+                    <span>Fiyat (USDT)</span>
                     <span>Miktar</span>
                     <span>Toplam</span>
                 </div>
@@ -452,9 +481,9 @@
         <div class="info-panel">
             <h3>ℹ️ Canlı Market Verileri</h3>
             <p>
-                Bu platform Binance ve Bybit API'lerinden gerçek zamanlı market verilerini çeker. 
-                Order book derinliği, fiyat hareketleri, hacim bilgileri ve likidite analizi canlı olarak güncellenir.
-                Büyük alış/satış emirlerinin yoğunlaştığı seviyeleri tespit ederek trading stratejilerinizi optimize edebilirsiniz.
+                Bu platform Binance ve Bybit borsalarından gerçek zamanlı market verilerini çeker. 
+                Order book derinliği, anlık fiyat hareketleri, hacim bilgileri tamamen gerçek API'lerden gelir.
+                Otomatik güncelleme her 10 saniyede bir gerçekleşir.
             </p>
         </div>
     </div>
@@ -462,10 +491,8 @@
     <script>
         let currentExchange = 'binance';
         let priceChart, depthChart;
-        let priceData = [];
-        let maxPricePoints = 50;
+        let updateInterval;
 
-        // API URLs
         const BINANCE_API = 'https://api.binance.com/api/v3';
         const BYBIT_API = 'https://api.bybit.com/v5';
 
@@ -477,14 +504,15 @@
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Fiyat',
+                        label: 'Fiyat (USDT)',
                         data: [],
                         borderColor: '#00d4ff',
                         backgroundColor: 'rgba(0, 212, 255, 0.1)',
                         tension: 0.4,
                         fill: true,
                         borderWidth: 3,
-                        pointRadius: 0
+                        pointRadius: 2,
+                        pointHoverRadius: 5
                     }]
                 },
                 options: {
@@ -496,12 +524,16 @@
                     },
                     plugins: {
                         legend: {
-                            labels: { color: '#aaa' }
+                            labels: { color: '#aaa', font: { size: 14 } }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
                             titleColor: '#00d4ff',
-                            bodyColor: '#fff'
+                            bodyColor: '#fff',
+                            borderColor: '#00d4ff',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false
                         }
                     },
                     scales: {
@@ -510,7 +542,7 @@
                             ticks: {
                                 color: '#aaa',
                                 callback: function(value) {
-                                    return '$' + value.toLocaleString();
+                                    return '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                                 }
                             }
                         },
@@ -527,21 +559,21 @@
                 type: 'line',
                 data: {
                     datasets: [{
-                        label: 'Alış',
+                        label: 'Alış Hacmi',
                         data: [],
                         borderColor: '#00ff88',
                         backgroundColor: 'rgba(0, 255, 136, 0.3)',
                         fill: true,
                         stepped: true,
-                        borderWidth: 2
+                        borderWidth: 3
                     }, {
-                        label: 'Satış',
+                        label: 'Satış Hacmi',
                         data: [],
                         borderColor: '#ff4757',
                         backgroundColor: 'rgba(255, 71, 87, 0.3)',
                         fill: true,
                         stepped: true,
-                        borderWidth: 2
+                        borderWidth: 3
                     }]
                 },
                 options: {
@@ -553,18 +585,26 @@
                     },
                     plugins: {
                         legend: {
-                            labels: { color: '#aaa' }
+                            labels: { color: '#aaa', font: { size: 14 } }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.9)',
                             titleColor: '#00d4ff',
-                            bodyColor: '#fff'
+                            bodyColor: '#fff',
+                            borderColor: '#00d4ff',
+                            borderWidth: 1,
+                            padding: 12
                         }
                     },
                     scales: {
                         y: {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: '#aaa' }
+                            ticks: {
+                                color: '#aaa',
+                                callback: function(value) {
+                                    return value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4});
+                                }
+                            }
                         },
                         x: {
                             type: 'linear',
@@ -572,13 +612,22 @@
                             ticks: {
                                 color: '#aaa',
                                 callback: function(value) {
-                                    return '$' + value.toLocaleString();
+                                    return '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                                 }
                             }
                         }
                     }
                 }
             });
+        }
+
+        // Show/Hide Loading
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
         }
 
         // Fetch Binance Data
@@ -588,22 +637,28 @@
             const depth = document.getElementById('depth').value;
 
             try {
-                // 24h Ticker
-                const tickerResponse = await fetch(`${BINANCE_API}/ticker/24hr?symbol=${symbol}`);
-                const ticker = await tickerResponse.json();
+                showLoading();
+                
+                // Fetch all data in parallel
+                const [tickerRes, depthRes, klinesRes] = await Promise.all([
+                    fetch(`${BINANCE_API}/ticker/24hr?symbol=${symbol}`),
+                    fetch(`${BINANCE_API}/depth?symbol=${symbol}&limit=${depth}`),
+                    fetch(`${BINANCE_API}/klines?symbol=${symbol}&interval=${interval}&limit=50`)
+                ]);
 
-                // Order Book
-                const depthResponse = await fetch(`${BINANCE_API}/depth?symbol=${symbol}&limit=${depth}`);
-                const orderbook = await depthResponse.json();
+                const ticker = await tickerRes.json();
+                const orderbook = await depthRes.json();
+                const klines = await klinesRes.json();
 
-                // Klines
-                const klinesResponse = await fetch(`${BINANCE_API}/klines?symbol=${symbol}&interval=${interval}&limit=50`);
-                const klines = await klinesResponse.json();
-
-                updateUI(ticker, orderbook, klines);
+                updateUIBinance(ticker, orderbook, klines);
+                document.getElementById('statusIndicator').className = 'status-indicator connected';
+                
             } catch (error) {
-                console.error('Binance API Error:', error);
+                console.error('Binance API Hatası:', error);
                 document.getElementById('statusIndicator').className = 'status-indicator disconnected';
+                alert('Binance API bağlantı hatası. Lütfen tekrar deneyin.');
+            } finally {
+                hideLoading();
             }
         }
 
@@ -614,47 +669,55 @@
             const depth = document.getElementById('depth').value;
 
             try {
-                // Ticker
-                const tickerResponse = await fetch(`${BYBIT_API}/market/tickers?category=linear&symbol=${symbol}`);
-                const tickerData = await tickerResponse.json();
-                const ticker = tickerData.result.list[0];
+                showLoading();
 
-                // Order Book
-                const depthResponse = await fetch(`${BYBIT_API}/market/orderbook?category=linear&symbol=${symbol}&limit=${depth}`);
-                const orderbookData = await depthResponse.json();
-                const orderbook = orderbookData.result;
+                const [tickerRes, depthRes, klinesRes] = await Promise.all([
+                    fetch(`${BYBIT_API}/market/tickers?category=linear&symbol=${symbol}`),
+                    fetch(`${BYBIT_API}/market/orderbook?category=linear&symbol=${symbol}&limit=${depth}`),
+                    fetch(`${BYBIT_API}/market/kline?category=linear&symbol=${symbol}&interval=${interval}&limit=50`)
+                ]);
 
-                // Klines
-                const klinesResponse = await fetch(`${BYBIT_API}/market/kline?category=linear&symbol=${symbol}&interval=${interval}&limit=50`);
-                const klinesData = await klinesResponse.json();
-                const klines = klinesData.result.list;
+                const tickerData = await tickerRes.json();
+                const depthData = await depthRes.json();
+                const klinesData = await klinesRes.json();
 
-                updateUIBybit(ticker, orderbook, klines);
+                if (tickerData.retCode === 0 && depthData.retCode === 0 && klinesData.retCode === 0) {
+                    const ticker = tickerData.result.list[0];
+                    const orderbook = depthData.result;
+                    const klines = klinesData.result.list;
+
+                    updateUIBybit(ticker, orderbook, klines);
+                    document.getElementById('statusIndicator').className = 'status-indicator connected';
+                } else {
+                    throw new Error('Bybit API yanıt hatası');
+                }
+
             } catch (error) {
-                console.error('Bybit API Error:', error);
+                console.error('Bybit API Hatası:', error);
                 document.getElementById('statusIndicator').className = 'status-indicator disconnected';
+                alert('Bybit API bağlantı hatası. Lütfen tekrar deneyin.');
+            } finally {
+                hideLoading();
             }
         }
 
-        // Update UI with Binance data
-        function updateUI(ticker, orderbook, klines) {
-            document.getElementById('statusIndicator').className = 'status-indicator connected';
-
-            // Update Stats
-            const currentPrice = parseFloat(ticker.lastPrice);
-            const priceChange = parseFloat(ticker.priceChangePercent);
+        // Update UI - Binance
+        function updateUIBinance(ticker, orderbook, klines) {
+            // Stats
+            const price = parseFloat(ticker.lastPrice);
+            const change = parseFloat(ticker.priceChangePercent);
             
-            document.getElementById('currentPrice').textContent = '$' + currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('currentPrice').textContent = '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
-            const changeElem = document.getElementById('priceChange');
-            changeElem.textContent = (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%';
-            changeElem.className = 'stat-value ' + (priceChange >= 0 ? 'positive' : 'negative');
+            const changeEl = document.getElementById('priceChange');
+            changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+            changeEl.className = 'stat-value ' + (change >= 0 ? 'positive' : 'negative');
             
             document.getElementById('volume24h').textContent = '$' + (parseFloat(ticker.quoteVolume) / 1000000).toFixed(2) + 'M';
             document.getElementById('high24h').textContent = '$' + parseFloat(ticker.highPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('low24h').textContent = '$' + parseFloat(ticker.lowPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-            // Calculate total bids and asks
+            // Order book totals
             const totalBids = orderbook.bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
             const totalAsks = orderbook.asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
             
@@ -662,22 +725,28 @@
             document.getElementById('totalAsks').textContent = totalAsks.toFixed(4);
             
             const spread = parseFloat(orderbook.asks[0][0]) - parseFloat(orderbook.bids[0][0]);
-            document.getElementById('spread').textContent = '$' + spread.toFixed(4);
+            const spreadPercent = (spread / price * 100).toFixed(3);
+            document.getElementById('spread').textContent = '$' + spread.toFixed(2) + ' (' + spreadPercent + '%)';
 
-            // Update Price Chart
-            priceChart.data.labels = klines.map((k, i) => i);
-            priceChart.data.datasets[0].data = klines.map(k => parseFloat(k[4]));
+            // Price Chart
+            const timestamps = klines.map((k, i) => {
+                const date = new Date(k[0]);
+                return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            });
+            const prices = klines.map(k => parseFloat(k[4]));
+            
+            priceChart.data.labels = timestamps;
+            priceChart.data.datasets[0].data = prices;
             priceChart.update('none');
 
-            // Update Depth Chart
+            // Depth Chart
             let cumulativeBids = 0;
-            let cumulativeAsks = 0;
-            
             const bidsData = orderbook.bids.map(bid => {
                 cumulativeBids += parseFloat(bid[1]);
                 return { x: parseFloat(bid[0]), y: cumulativeBids };
             }).reverse();
 
+            let cumulativeAsks = 0;
             const asksData = orderbook.asks.map(ask => {
                 cumulativeAsks += parseFloat(ask[1]);
                 return { x: parseFloat(ask[0]), y: cumulativeAsks };
@@ -687,29 +756,27 @@
             depthChart.data.datasets[1].data = asksData;
             depthChart.update('none');
 
-            // Update Order Books
+            // Order Books
             updateOrderBooks(orderbook.bids, orderbook.asks);
         }
 
-        // Update UI with Bybit data
+        // Update UI - Bybit
         function updateUIBybit(ticker, orderbook, klines) {
-            document.getElementById('statusIndicator').className = 'status-indicator connected';
-
-            // Update Stats
-            const currentPrice = parseFloat(ticker.lastPrice);
-            const priceChange = parseFloat(ticker.price24hPcnt) * 100;
+            // Stats
+            const price = parseFloat(ticker.lastPrice);
+            const change = parseFloat(ticker.price24hPcnt) * 100;
             
-            document.getElementById('currentPrice').textContent = '$' + currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('currentPrice').textContent = '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
-            const changeElem = document.getElementById('priceChange');
-            changeElem.textContent = (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%';
-            changeElem.className = 'stat-value ' + (priceChange >= 0 ? 'positive' : 'negative');
+            const changeEl = document.getElementById('priceChange');
+            changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+            changeEl.className = 'stat-value ' + (change >= 0 ? 'positive' : 'negative');
             
             document.getElementById('volume24h').textContent = '$' + (parseFloat(ticker.turnover24h) / 1000000).toFixed(2) + 'M';
             document.getElementById('high24h').textContent = '$' + parseFloat(ticker.highPrice24h).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('low24h').textContent = '$' + parseFloat(ticker.lowPrice24h).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-            // Calculate total bids and asks
+            // Order book totals
             const totalBids = orderbook.b.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
             const totalAsks = orderbook.a.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
             
@@ -717,23 +784,29 @@
             document.getElementById('totalAsks').textContent = totalAsks.toFixed(4);
             
             const spread = parseFloat(orderbook.a[0][0]) - parseFloat(orderbook.b[0][0]);
-            document.getElementById('spread').textContent = '$' + spread.toFixed(4);
+            const spreadPercent = (spread / price * 100).toFixed(3);
+            document.getElementById('spread').textContent = '$' + spread.toFixed(2) + ' (' + spreadPercent + '%)';
 
-            // Update Price Chart (Bybit klines are reversed)
+            // Price Chart
             const reversedKlines = [...klines].reverse();
-            priceChart.data.labels = reversedKlines.map((k, i) => i);
-            priceChart.data.datasets[0].data = reversedKlines.map(k => parseFloat(k[4]));
+            const timestamps = reversedKlines.map(k => {
+                const date = new Date(parseInt(k[0]));
+                return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            });
+            const prices = reversedKlines.map(k => parseFloat(k[4]));
+            
+            priceChart.data.labels = timestamps;
+            priceChart.data.datasets[0].data = prices;
             priceChart.update('none');
 
-            // Update Depth Chart
+            // Depth Chart
             let cumulativeBids = 0;
-            let cumulativeAsks = 0;
-            
             const bidsData = orderbook.b.map(bid => {
                 cumulativeBids += parseFloat(bid[1]);
                 return { x: parseFloat(bid[0]), y: cumulativeBids };
             }).reverse();
 
+            let cumulativeAsks = 0;
             const asksData = orderbook.a.map(ask => {
                 cumulativeAsks += parseFloat(ask[1]);
                 return { x: parseFloat(ask[0]), y: cumulativeAsks };
@@ -743,7 +816,7 @@
             depthChart.data.datasets[1].data = asksData;
             depthChart.update('none');
 
-            // Update Order Books
+            // Order Books
             updateOrderBooks(orderbook.b, orderbook.a);
         }
 
@@ -752,30 +825,34 @@
             const bidsBook = document.getElementById('bidsBook');
             const asksBook = document.getElementById('asksBook');
 
-            bidsBook.innerHTML = bids.slice(0, 10).map(bid => {
-                const total = parseFloat(bid[0]) * parseFloat(bid[1]);
+            bidsBook.innerHTML = bids.slice(0, 15).map(bid => {
+                const price = parseFloat(bid[0]);
+                const amount = parseFloat(bid[1]);
+                const total = price * amount;
                 return `
                     <div class="orderbook-row bid">
-                        <span>${parseFloat(bid[0]).toFixed(2)}</span>
-                        <span>${parseFloat(bid[1]).toFixed(4)}</span>
+                        <span>${price.toFixed(2)}</span>
+                        <span>${amount.toFixed(4)}</span>
                         <span>${total.toFixed(2)}</span>
                     </div>
                 `;
             }).join('');
 
-            asksBook.innerHTML = asks.slice(0, 10).map(ask => {
-                const total = parseFloat(ask[0]) * parseFloat(ask[1]);
+            asksBook.innerHTML = asks.slice(0, 15).map(ask => {
+                const price = parseFloat(ask[0]);
+                const amount = parseFloat(ask[1]);
+                const total = price * amount;
                 return `
                     <div class="orderbook-row ask">
-                        <span>${parseFloat(ask[0]).toFixed(2)}</span>
-                        <span>${parseFloat(ask[1]).toFixed(4)}</span>
+                        <span>${price.toFixed(2)}</span>
+                        <span>${amount.toFixed(4)}</span>
                         <span>${total.toFixed(2)}</span>
                     </div>
                 `;
             }).join('');
         }
 
-        // Fetch data based on selected exchange
+        // Fetch data based on exchange
         function fetchData() {
             if (currentExchange === 'binance') {
                 fetchBinanceData();
@@ -784,20 +861,22 @@
             }
         }
 
-        // Exchange tab switching
+        // Event Listeners
         document.querySelectorAll('.exchange-tab').forEach(tab => {
             tab.addEventListener('click', function() {
                 document.querySelectorAll('.exchange-tab').forEach(t => t.classList.remove('active'));
                 this.classList.add('active');
                 currentExchange = this.dataset.exchange;
+                document.getElementById('exchangeName').textContent = currentExchange === 'binance' ? 'Binance' : 'Bybit';
+                
+                // Clear old interval and set new one
+                if (updateInterval) clearInterval(updateInterval);
                 fetchData();
+                updateInterval = setInterval(fetchData, 10000);
             });
         });
 
-        // Update button
         document.getElementById('updateBtn').addEventListener('click', fetchData);
-
-        // Symbol, interval, depth change
         document.getElementById('symbol').addEventListener('change', fetchData);
         document.getElementById('interval').addEventListener('change', fetchData);
         document.getElementById('depth').addEventListener('change', fetchData);
@@ -805,9 +884,9 @@
         // Initialize
         initCharts();
         fetchData();
-
-        // Auto-update every 5 seconds
-        setInterval(fetchData, 5000);
+        
+        // Auto-update every 10 seconds
+        updateInterval = setInterval(fetchData, 10000);
     </script>
 </body>
 </html>
